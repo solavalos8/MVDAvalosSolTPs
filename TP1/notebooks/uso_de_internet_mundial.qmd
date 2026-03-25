@@ -71,3 +71,61 @@ indicadores_limpia <- indicadores_por_region_income %>%
   filter(year >= 2013, year <= 2023)
 
 ```
+
+```{r}
+# Calculamos el promedio de uso de internet por año y grupo de ingresos
+resumen_indicadores <- indicadores_limpia %>%
+    group_by(year, income_group, indicator_name) %>%
+    summarize(
+        promedio_internet = mean(internet_users, na.rm = TRUE),
+        .groups = "drop"
+    )
+```
+
+```{r}
+# Ordenamos los niveles de ingreso jerárquicamente
+resumen_indicadores$income_group <- factor(
+    resumen_indicadores$income_group,
+    levels = c("Low income", "Lower middle income", 
+               "Upper middle income", "High income")
+)
+```
+
+```{r}
+#Pasamos a formato wide para que cada grupo de ingresos quede como una columna
+resumen_wide <- resumen_indicadores %>%
+    pivot_wider(names_from = income_group, values_from = promedio_internet) %>%
+    select(year,`Low income`, `Lower middle income`, `Upper middle income`,`High income`,`indicator_name`) %>%
+    arrange(year)
+```
+
+```{r}
+#Cálculo de crecimiento porcentual 
+crecimiento <- indicadores_limpia %>%
+  group_by(income_group) %>%
+  summarize(
+    valor_2013 = mean(internet_users[year == 2013], na.rm = TRUE),
+    valor_2023 = mean(internet_users[year == 2023], na.rm = TRUE),
+    crecimiento_pct = ((valor_2023 - valor_2013) / valor_2013) * 100,
+    .groups = "drop"
+  )
+```
+
+```{r}
+#Agrupamos para validar hipótesis
+crecimiento_grupos <- crecimiento %>%
+  mutate(
+    grupo = case_when(
+      income_group %in% c("Low income", "Lower middle income") ~ "Bajos ingresos",
+      TRUE ~ "Altos ingresos"
+    )
+  ) %>%
+  group_by(grupo) %>%
+  summarize(
+    crecimiento_promedio = mean(crecimiento_pct),
+    .groups = "drop"
+  )
+```
+```{r}
+write_csv(resumen_wide, "../output/resultado_hipotesis.csv")
+```
