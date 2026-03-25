@@ -1,0 +1,20 @@
+```         
+---
+title: "uso_de_internet_mundial"
+format: html
+editor: visual
+---
+```
+
+```{r}
+library(tidyverse)
+library(janitor)
+```
+```{r}
+internet <- read_csv("../data/internet_users_world_wide.csv", skip = 4)
+paises <- read_csv("../data/metadata_countries_internet_users.csv")
+```
+```{r}
+glimpse(internet)
+```
+
