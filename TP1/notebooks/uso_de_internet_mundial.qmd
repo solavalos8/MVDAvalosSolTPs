@@ -1,0 +1,32 @@
+```         
+---
+title: "uso_de_internet_mundial"
+format: html
+editor: visual
+---
+```
+
+```{r}
+library(tidyverse)
+library(janitor)
+```
+
+```{r}
+#Creamos funcion para cargar datos
+cargar_datos <- function(path) {
+  df <- read_csv(path, skip = 4)
+  print(names(df))
+  return(df)
+}
+```
+
+```{r}
+internet <- cargar_datos("../data/internet_users_world_wide.csv")
+paises <- read_csv("../data/metadata_countries_internet_users.csv")
+```
+
+
+```{r}
+glimpse(internet)
+```
+
