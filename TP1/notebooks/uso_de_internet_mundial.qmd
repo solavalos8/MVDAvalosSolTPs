@@ -30,3 +30,44 @@ paises <- read_csv("../data/metadata_countries_internet_users.csv")
 glimpse(internet)
 ```
 
+```{r}
+# Normalizamos nombres de columnas para evitar problemas con espacios y mayúsculas usando la función clean_names() del paquete janitor
+internet <- internet %>% 
+    clean_names()
+
+paises <- paises %>%
+    clean_names()
+```
+
+```{r}
+#Ahora podemos transformar la tabla de indicadores de formato Wide a Long para tener una columna que se llame "year" y otra que contenga el valor del indicador
+internet_long <- internet %>%
+    pivot_longer(
+        cols = -c(country_name, country_code, indicator_name, indicator_code),
+        names_to = "year",
+        values_to = "internet_users"
+    )
+```
+
+```{r}
+#Limpiamos la variable year y la convertimos a numero
+library(stringr)
+
+internet_long$year <- str_extract(internet_long$year, "\\d{4}")
+
+internet_long$year <- as.numeric(internet_long$year)
+```
+
+```{r}
+#Realizamos un left_join() para unir los indicadores con su respectiva región y grupo de ingresos.
+
+indicadores_por_region_income <- left_join(internet_long, paises, by = "country_code")
+```
+
+```{r}
+#Borramos los NA (datos faltantes) de las varables que nos conciernen para nuestro analisis
+indicadores_limpia <- indicadores_por_region_income %>%
+    drop_na("region","income_group") %>% 
+  filter(year >= 2013, year <= 2023)
+
+```
