@@ -11,6 +11,7 @@ library(tidyverse)
 library(janitor)
 ```
 
+
 ```{r}
 #Creamos funcion para cargar datos
 cargar_datos <- function(path) {
@@ -27,8 +28,14 @@ paises <- read_csv("../data/metadata_countries_internet_users.csv")
 
 
 ```{r}
+internet <- read_csv("../data/internet_users_world_wide.csv", skip = 4)
+paises <- read_csv("../data/metadata_countries_internet_users.csv")
+```
+
+```{r}
 glimpse(internet)
 ```
+
 
 ```{r}
 # Normalizamos nombres de columnas para evitar problemas con espacios y mayúsculas usando la función clean_names() del paquete janitor
@@ -126,6 +133,8 @@ crecimiento_grupos <- crecimiento %>%
     .groups = "drop"
   )
 ```
+
 ```{r}
 write_csv(resumen_wide, "../output/resultado_hipotesis.csv")
 ```
+
