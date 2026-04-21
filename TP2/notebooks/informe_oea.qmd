@@ -1,0 +1,28 @@
+---
+title: "Web scraping y procesamiento del lenguaje natural: Comunicados de prensa OEA"
+format: html
+editor: visual
+---
+
+## Introducción
+
+\[Acá describís brevemente el objetivo del análisis y la pregunta que querés responder\]
+
+## Metodología
+
+\[Acá explicás la estructura del proyecto y los pasos seguidos\]
+
+```{r}
+#| message: false
+#| warning: false
+
+library(here)
+
+source(here("TP2/scripts/scraping_oea.R"))
+source(here("TP2/scripts/processing.R"))
+source(here("TP2/scripts/metrics_figures.R"))
+```
+
+## Resultados e interpretación
+
+\[Acá va la figura generada y tu interpretación\]
