@@ -2,3 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+TP2/data/*.rds
+TP2/output/*.rds
+.DS_Store
+.Rhistory
+.RData

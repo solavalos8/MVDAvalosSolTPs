@@ -6,11 +6,11 @@ editor: visual
 
 ## Introducción
 
-\[Acá describís brevemente el objetivo del análisis y la pregunta que querés responder\]
+El objetivo de este trabajo es aplicar las herramientas de web scraping y procesamiento de lenguaje natural que estuvimos viendo las últimas clases. Para ello, se estará haciendo web scraping en la página que contiene los comunicados oficiales de la OEA y se extraerá y procesará el texto
 
 ## Metodología
 
-\[Acá explicás la estructura del proyecto y los pasos seguidos\]
+Se realizó web scraping sobre los comunicados de prensa de la OEA (Organización de los Estados Americanos) con el objetivo de obtener los comunicados de prensa para los meses de Enero, Febrero, Marzo y Abril del 2026. Una vez obtenidos los datos, se utilizaron técnicas de NLP (Natural Language Processing) para limpiar, lematizar, tokenizar y eliminar stopwords. Por ultimo, se eligieron 5 palabras de entre las 20 más utilizadas y se diseñó un gráfico de barras que incluye estas palabras y su frecuencia de aparición.
 
 ```{r}
 #| message: false
@@ -23,6 +23,6 @@ source(here("TP2/scripts/processing.R"))
 source(here("TP2/scripts/metrics_figures.R"))
 ```
 
-## Resultados e interpretación
+## Resultados
 
-\[Acá va la figura generada y tu interpretación\]
+![](images/frecuencia_terminos.png)
