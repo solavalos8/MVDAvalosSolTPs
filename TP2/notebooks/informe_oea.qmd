@@ -26,3 +26,11 @@ source(here("TP2/scripts/metrics_figures.R"))
 ## Resultados
 
 ![](images/frecuencia_terminos.png)
+
+## Interpretación
+
+El gráfico presenta la frecuencia de cinco términos seleccionados entre los más recurrentes en los comunicados de prensa de la OEA durante el primer cuatrimestre de 2026.
+
+La prominencia de palabras como **"misión"** (más de 400 menciones), **"electoral"** (aproximadamente 250), **"democrático"** (aproximadamente 210) y **"americano"** (aproximadamente 195) refleja con claridad los pilares fundamentales del mandato institucional de la OEA: el fortalecimiento de la democracia y el acompañamiento de procesos electorales en el continente. El término **"desarrollo"** (aproximadamente 140 menciones), aunque menos frecuente dentro del grupo, evidencia que la organización también sostiene una agenda vinculada al progreso socioeconómico de la región.
+
+En conjunto, estos términos ilustran que la OEA se posiciona públicamente como un organismo orientado a la defensa de valores democráticos, la supervisión electoral y el desarrollo regional, ejes que se ven claramente reflejados en su comunicación institucional.
