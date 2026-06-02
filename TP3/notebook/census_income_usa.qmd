@@ -1,0 +1,110 @@
+---
+title: "TP3 – Regresión Logística Binomial"
+subtitle: "Census Income USA – Análisis de factores socioeconómicos del ingreso"
+author: "Sol Avalos"
+date: "`r Sys.Date()`"
+lang: es
+execute:
+  echo: true
+  output: true
+  eval: true
+  cache: true
+format:
+  html:
+    toc: true
+    toc-location: left
+    toc-title: "Contenidos"
+    embed-resources: true
+    theme: cosmo
+    code-fold: false
+    code-tools: true
+    df-print: paged
+    include-in-header:
+      text: |
+        <style>
+        body {
+          text-align: justify;
+          font-size: 16px;
+          line-height: 1.6;
+        }
+        h1, h2, h3 {
+          color: #2C3E50;
+        }
+        .callout {
+          margin-top: 1.5em;
+          margin-bottom: 1.5em;
+        }
+        </style>
+---
+
+## Librerías necesarias
+
+``` {r}
+if (!require("pacman")) install.packages("pacman")
+
+# Cargamos todas las librerías requeridas para la sesión
+pacman::p_load(
+  tidyverse,        # Manipulación de datos (dplyr, tidyr) y visualización(ggplot2)
+  here,            # Manejo de rutas relativas al proyecto
+  janitor,         # Limpieza de nombres de columnas
+  scales,          # Formateo de ejes en gráficos
+  broom,           # Convierte outputs de modelos a dataframes
+  modelsummary,    # Tablas de comparación de modelos
+  kableExtra,      # Decoración de tablas
+  marginaleffects, # Efectos marginales promedio (AME)
+  yardstick,       # Métricas de evaluación (ROC, AUC)
+  patchwork        # Composición de gráficos
+)
+```
+
+## Base de datos de 'Adult Census Income'
+
+``` {r}
+#Carga de datos
+datos_raw <- read.csv(
+  here("data", "adult_census_USA.csv"), 
+  stringsAsFactors = FALSE
+)
+
+glimpse(datos_raw)
+```
+
+``` {r}
+#Limpieza y transformacion de datos
+datos <- datos_raw |>
+  mutate(
+    # Transformación de variable respuesta como factor con orden explícito de 
+    #niveles:
+    # "<=50K" = referencia (nivel 1), ">50K" = clase a predecir (nivel 2)
+    income = factor(income, levels = c("<=50K", ">50K")),
+    
+    # Sex como factor
+    # "Female" como referencia: interpretaremos el efecto de ser Male
+    # respecto a ser Female sobre la probabilidad de ingreso alto
+    sex = factor(sex, levels = c("Female", "Male")),
+    
+    # Race como factor
+    # "White" como referencia por ser la categoría mayoritaria.
+    race = factor(race, levels = c("White", "Asian-Pac-Islander",
+                                   "Amer-Indian-Eskimo", "Other", "Black")),
+    
+    # Education como factor ordenado de menor a mayor nivel
+    # El orden importa para los gráficos y para la interpretación
+    education = factor(education,
+                       levels = c("Preschool","1st-4th","5th-6th",
+                                  "7th-8th","9th","10th","11th","12th",
+                                  "HS-grad","Some-college","Assoc-voc",
+                                  "Assoc-acdm","Bachelors","Masters",
+                                  "Prof-school","Doctorate"))
+  )
+
+# Verificación del balance
+cat("Distribución de la variable objetivo:\n")
+table(datos$income)
+
+cat("\nProporciones:\n")
+prop.table(table(datos$income)) |> round(3)
+
+#La variable objetivo se encuentra prácticamente balanceada (52.4% <=50K, 47.6% >50K), lo que garantiza que el modelo no estará sesgado hacia ninguna de las dos clases.
+```
+
