@@ -193,7 +193,7 @@ El gráfico exploratorio de sexo refuerza esta sospecha: la brecha entre hombres
 
 ## Ajuste de Modelos (Regresión Logística)
 
-``` {r}
+```{r}
 # Modelo 1: efectos principales sin interacción
 # Categorías de referencia:
 # - sex: "Female"
@@ -217,3 +217,138 @@ modelo_int <- glm(
 summary(modelo_base)
 summary(modelo_int)
 ```
+
+## Interpretación de Resultados y Efectos Marginales
+
+### Efectos marginales promedio (AME)
+
+```{r}
+# Calculamos el AME estándar (dY/dX) para todas las variables del modelo
+ame <- avg_slopes(
+  modelo_int,
+  variables = c("education_num", "sex", "race"),
+  slope = "dydx"
+)
+
+# Mostramos en tabla limpia
+ame |>
+  select(term, contrast, estimate, conf.low, conf.high, p.value) |>
+  mutate(
+    estimate_pct = paste0(round(estimate * 100, 2), "%"),
+    interpretacion = case_when(
+      estimate > 0 & p.value < 0.05 ~ "Aumenta prob. (Sig.)",
+      estimate < 0 & p.value < 0.05 ~ "Reduce prob. (Sig.)",
+      TRUE ~ "No significativo"
+    )
+  ) |>
+  select(term, contrast, estimate_pct, conf.low, conf.high, p.value, interpretacion) |>
+  rename(
+    `Predictor`      = term,
+    `Contraste`      = contrast,
+    `Efecto (Prob)`  = estimate_pct,
+    `IC Inferior`    = conf.low,
+    `IC Superior`    = conf.high,
+    `Valor p`        = p.value,
+    `Interpretación` = interpretacion
+  ) |>
+  knitr::kable(
+    digits = 4,
+    caption = "Efectos Marginales Promedio (Cambio en Probabilidad)"
+  ) |>
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  ) |>
+  row_spec(
+    row = which(ame$p.value < 0.05),
+    bold = TRUE,
+    color = "black",
+    background = "#e6f2ff"
+  )
+```
+
+#### Interpretación directa (AME):
+
+- `education_num` (dY/dX): en promedio poblacional, un aumento de un nivel educativo aumenta la probabilidad absoluta de tener ingresos superiores a USD 50.000 en 7.07 puntos porcentuales. Es el segundo predictor más fuerte del modelo.
+
+- `sex` (Male - Female): en promedio, los hombres tienen una probabilidad 26.96 puntos porcentuales mayor de pertenecer al estrato de ingresos altos que las mujeres. Es, por lejos, el predictor más fuerte del modelo.
+
+- `race`: los grupos `Black` y `Amer-Indian-Eskimo` presentan una probabilidad aproximadamente 9.22 puntos porcentuales menor que la población blanca, mientras que `Other` muestra la brecha más amplia con -17.33 puntos porcentuales. `Asian-Pac-Islander` no resultó significativo: a pesar de mostrar la mayor proporción de ingresos altos en el análisis exploratorio, al controlar por educación y sexo el efecto desaparece, lo que sugiere que esa ventaja se explicaría por su composición educativa más que por la pertenencia racial en sí misma.
+
+- `education_num:sexMale`: el término de interacción no resultó significativo. Al promediar sobre todas las observaciones, no hay evidencia de que el retorno económico de la educación difiera entre hombres y mujeres en este dataset.
+
+## Gráfico de Coeficientes (Odds Ratios) con barras graduadas
+
+```{r}
+# Extraemos los coeficientes del modelo interactivo con broom
+or_data <- tidy(modelo_int, conf.int = TRUE, conf.level = 0.95) |>
+  filter(term != "(Intercept)") |>
+  mutate(
+    # Exponenciamos para obtener Odds Ratios
+    or      = exp(estimate),
+    ci80_lo = exp(estimate - qnorm(0.90) * std.error),
+    ci80_hi = exp(estimate + qnorm(0.90) * std.error),
+    ci95_lo = exp(estimate - qnorm(0.975) * std.error),
+    ci95_hi = exp(estimate + qnorm(0.975) * std.error),
+    ci99_lo = exp(estimate - qnorm(0.995) * std.error),
+    ci99_hi = exp(estimate + qnorm(0.995) * std.error),
+    # Etiquetas más legibles para el gráfico
+    term = recode(term,
+                  "education_num"          = "Educación (num.)",
+                  "sexMale"                = "Sexo: Male",
+                  "raceAsian-Pac-Islander" = "Raza: Asian-Pac-Islander",
+                  "raceAmer-Indian-Eskimo" = "Raza: Amer-Indian-Eskimo",
+                  "raceOther"              = "Raza: Other",
+                  "raceBlack"              = "Raza: Black",
+                  "education_num:sexMale"  = "Educación × Sexo (Male)"
+    ),
+    # Significancia para colorear
+    significativo = p.value < 0.05
+  )
+
+# Forest plot
+ggplot(or_data, aes(x = or, y = reorder(term, or))) +
+  # Línea de referencia en OR = 1 (sin efecto)
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  # IC 99% — más fino
+  geom_errorbarh(aes(xmin = ci99_lo, xmax = ci99_hi),
+                 height = 0, linewidth = 0.5, color = "gray60") +
+  # IC 95% — grosor medio
+  geom_errorbarh(aes(xmin = ci95_lo, xmax = ci95_hi),
+                 height = 0, linewidth = 1.2, color = "gray40") +
+  # IC 80% — más grueso
+  geom_errorbarh(aes(xmin = ci80_lo, xmax = ci80_hi),
+                 height = 0, linewidth = 2.2, color = "gray20") +
+  # Punto central (OR)
+  geom_point(aes(color = significativo), size = 3) +
+  scale_color_manual(values = c("TRUE" = "#2B6CB0", "FALSE" = "gray60"),
+                     labels = c("TRUE" = "Significativo", "FALSE" = "No significativo"),
+                     name = NULL) +
+  # Escala logarítmica en X como pide la consigna
+  scale_x_log10() +
+  labs(
+    title    = "Efectos sociodemográficos sobre la probabilidad de ingresos altos",
+    subtitle = "Odds Ratios del modelo interactivo. Barras de error: 80% (gruesa), 95% (media), 99% (fina).",
+    x        = "Odds Ratio (escala log)",
+    y        = NULL
+  ) +
+  theme(
+  plot.title    = element_text(face = "bold", hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)
+```
+
+#### **Interpretación de los Odds Ratios (variables significativas):**
+
+- `Sexo: Male`: los hombres tienen aproximadamente 4.5 veces más chances de pertenecer al estrato de ingresos altos que las mujeres, manteniendo el resto de las variables constantes. Es el efecto más pronunciado del modelo.
+
+- `Educación (num.)`: por cada nivel adicional de educación, las chances de tener ingresos altos aumentan un 45% aproximadamente. El efecto es acumulativo y estadísticamente muy robusto.
+
+- `Raza: Black`: las personas de raza negra tienen aproximadamente un 37% menos chances de pertenecer al estrato de ingresos altos respecto a la población blanca.
+
+- `Raza: Amer-Indian-Eskimo`: este grupo presenta aproximadamente un 37% menos chances que la categoría de referencia, similar a `Black`.
+
+- `Raza: Other`: es el grupo con la mayor desventaja relativa, con aproximadamente un 60% menos chances que la población blanca.
+
+- `Educación × Sexo (Male)`: el término de interacción no resultó significativo, lo que indica que no hay evidencia de que el efecto de la educación sobre las chances de ingresos altos difiera entre hombres y mujeres en este dataset.
