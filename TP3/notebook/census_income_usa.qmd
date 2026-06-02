@@ -39,7 +39,7 @@ format:
 
 ## Librerías necesarias
 
-``` {r}
+```{r}
 if (!require("pacman")) install.packages("pacman")
 
 # Cargamos todas las librerías requeridas para la sesión
@@ -59,7 +59,7 @@ pacman::p_load(
 
 ## Base de datos de 'Adult Census Income'
 
-``` {r}
+```{r}
 #Carga de datos
 datos_raw <- read.csv(
   here("data", "adult_census_USA.csv"), 
@@ -69,7 +69,7 @@ datos_raw <- read.csv(
 glimpse(datos_raw)
 ```
 
-``` {r}
+```{r}
 #Limpieza y transformacion de datos
 datos <- datos_raw |>
   mutate(
@@ -108,3 +108,73 @@ prop.table(table(datos$income)) |> round(3)
 #La variable objetivo se encuentra prácticamente balanceada (52.4% <=50K, 47.6% >50K), lo que garantiza que el modelo no estará sesgado hacia ninguna de las dos clases.
 ```
 
+## Análisis Exploratorio y Decisiones de Transformación
+
+Hacemos un grafico por variable, es decir, hacemos tres gráficos.
+
+### Education vs income:
+
+```{r}
+#| fig-height: 5
+datos |>
+  ggplot(aes(x = education, fill = income)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("<=50K" = "#718096", ">50K" = "#2B6CB0")) +
+  coord_flip() +
+  labs(
+    title = "Proporción de ingreso alto según nivel educativo",
+    x = NULL,
+    y = "Proporción",
+    fill = "Ingreso"
+  ) +
+  theme_minimal()
+
+```
+
+#### Interpretación:
+
+Se observa una relación positiva clara: a mayor nivel educativo, mayor proporción de individuos con ingresos superiores a USD 50.000. Los niveles universitarios y de posgrado concentran la mayor proporción de ingresos altos, mientras que los niveles primarios y secundarios iniciales son casi exclusivamente de ingresos bajos.
+
+### Sex vs. Income:
+
+```{r}
+datos |>
+  ggplot(aes(x = sex, fill = income)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("<=50K" = "#718096", ">50K" = "#2B6CB0")) +
+  labs(
+    title = "Proporción de ingreso alto según sexo",
+    x = NULL,
+    y = "Proporción",
+    fill = "Ingreso"
+  ) +
+  theme_minimal()
+```
+
+#### Interpretación:
+
+Existe una brecha marcada: los hombres presentan una proporción de ingresos altos cercana al 50%, mientras que en las mujeres no supera el 25%. Esto sugiere que el sexo es un predictor relevante del ingreso y motiva la inclusión de una interacción con educación en el modelo.
+
+### Race vs. Income:
+
+```{r}
+datos |>
+  ggplot(aes(x = race, fill = income)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("<=50K" = "#718096", ">50K" = "#2B6CB0")) +
+  labs(
+    title = "Proporción de ingreso alto según raza",
+    x = NULL,
+    y = "Proporción",
+    fill = "Ingreso"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+#### Interpretación:
+
+El grupo `Asian-Pac-Islander` registra la mayor proporción de ingresos altos, seguido por `White`. Los grupos `Black`, `Other` y `Amer-Indian-Eskimo` presentan proporciones considerablemente menores, lo que es consistente con la literatura sobre desigualdad racial en el mercado laboral estadounidense.
