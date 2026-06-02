@@ -352,3 +352,51 @@ ggplot(or_data, aes(x = or, y = reorder(term, or))) +
 - `Raza: Other`: es el grupo con la mayor desventaja relativa, con aproximadamente un 60% menos chances que la población blanca.
 
 - `Educación × Sexo (Male)`: el término de interacción no resultó significativo, lo que indica que no hay evidencia de que el efecto de la educación sobre las chances de ingresos altos difiera entre hombres y mujeres en este dataset.
+
+## Comparación Global de Modelos
+
+```{r}
+bind_rows(
+  broom::glance(modelo_base) |> mutate(Modelo = "1. Sin interacción"),
+  broom::glance(modelo_int)  |> mutate(Modelo = "2. Con interacción")
+) |>
+  mutate(pseudo_r2 = 1 - (deviance / null.deviance)) |>
+  select(Modelo, null.deviance, deviance, pseudo_r2, AIC, nobs) |>
+  rename(
+    `Deviance Nula`        = null.deviance,
+    `Deviance Residual`    = deviance,
+    `Pseudo-R² (McFadden)` = pseudo_r2,
+    `Observaciones`        = nobs
+  ) |>
+  knitr::kable(
+    digits  = c(0, 1, 1, 3, 1, 0),
+    caption = "Comparación global de modelos — Regresión logística binomial"
+  ) |>
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  ) |>
+  row_spec(
+    row        = 1,  # Resaltamos el modelo base porque es el que tiene menor AIC
+    bold       = TRUE,
+    color      = "black",
+    background = "#e6f2ff"
+  )
+```
+
+#### Interpretación:
+
+La comparación global de modelos indica que la inclusión del término de interacción `education_num * sex` no mejora el ajuste. El modelo base y el interactivo explican la misma proporción de variación en el ingreso (Pseudo-R² de 0.169 en ambos casos), y la diferencia en AIC es mínima (de hecho, el modelo base tiene un AIC levemente menor, lo que significa que es preferible). En términos simples: incorporar la hipótesis de que el efecto de la educación es distinto para hombres y mujeres no agrega información útil al modelo. El modelo más simple explica los datos igual de bien, y por eso es el que nos quedamos.
+
+## Conclusión
+
+El análisis buscó identificar qué factores sociodemográficos determinan la probabilidad de que un ciudadano estadounidense pertenezca al estrato de ingresos altos (más de USD 50.000 anuales). Los tres predictores seleccionados (sexo, nivel educativo y raza) resultaron en conjunto altamente relevantes, aunque con matices importantes.
+
+El hallazgo más contundente es la brecha de género. Ser hombre incrementa en casi 27 puntos porcentuales la probabilidad de tener ingresos altos respecto a ser mujer, independientemente del nivel educativo o la raza. Este resultado no sorprende a la luz de la literatura sobre mercados laborales, pero su magnitud es llamativa, ya que el sexo resultó ser el predictor más fuerte del modelo, por encima incluso de la educación.
+
+La educación, por su parte, tiene un efecto positivo y robusto: cada nivel adicional de escolaridad aumenta en promedio 7 puntos porcentuales la probabilidad de ingresos altos. Sin embargo, la hipótesis de que ese retorno educativo es distinto para hombres y mujeres, no encontró respaldo en los datos. El modelo interactivo no mejora al modelo base ni en ajuste ni en capacidad explicativa, lo que sugiere que la brecha de género opera de forma relativamente uniforme a lo largo de todos los niveles educativos.
+
+En cuanto a la raza, los resultados muestran desigualdades estructurales persistentes. Los grupos `Black`, `Amer-Indian-Eskimo` y `Other` presentan probabilidades significativamente menores de acceder a ingresos altos respecto a la población blanca, aun controlando por educación y sexo. Esto indica que la desventaja racial no se explica únicamente por diferencias en el nivel educativo, sino que refleja barreras adicionales en el mercado laboral. El caso de `Asian-Pac-Islander` es particularmente interesante. A pesar de mostrar la mayor proporción de ingresos altos en el análisis exploratorio, su efecto desaparece al controlar por las demás variables, lo que sugiere que esa ventaja aparente se debe a su mayor nivel educativo promedio y no a la pertenencia racial en sí misma.
+
+En síntesis, el modelo revela que el ingreso en Estados Unidos está fuertemente influenciado por el género y atravesado por desigualdades raciales que persisten más allá de la educación. La educación importa, pero no alcanza para explicar por sí sola quién accede al estrato de ingresos altos.
