@@ -178,3 +178,42 @@ datos |>
 #### Interpretación:
 
 El grupo `Asian-Pac-Islander` registra la mayor proporción de ingresos altos, seguido por `White`. Los grupos `Black`, `Other` y `Amer-Indian-Eskimo` presentan proporciones considerablemente menores, lo que es consistente con la literatura sobre desigualdad racial en el mercado laboral estadounidense.
+
+### **¿Es necesario transformar alguna variable continua?**
+
+Si bien en el análisis exploratorio se utilizó `education` como factor para visualizar la distribución del ingreso en cada nivel educativo, la relación observada (positiva y progresiva sin saltos abruptos evidentes) justifica tratar la educación como variable continua en el modelo mediante `education_num`.
+
+La variable `education_num`, toma valores enteros del 1 al 16 de forma ordenada y sin valores extremos problemáticos. Además, no presenta discontinuidades ni colas largas que distorsionen el ajuste. Por lo tanto, no es necesario aplicar ninguna transformación logarítmica sobre esta variable.
+
+### **¿Necesitamos una interacción?**
+
+Una hipótesis plausible es que **la brecha de género en el acceso a ingresos altos se amplía o se reduce según el nivel educativo**. Es decir, podríamos sospechar que el retorno económico de la educación no es equivalente para hombres y mujeres: a medida que aumenta el nivel educativo, la probabilidad de ingresos altos podría crecer de forma diferente para cada sexo. Esto es consistente con la literatura sobre brechas salariales de género, que documenta que las mujeres frecuentemente necesitan mayores credenciales educativas para acceder a posiciones equivalentes a las de sus pares masculinos.
+
+El gráfico exploratorio de sexo refuerza esta sospecha: la brecha entre hombres y mujeres es marcada incluso sin controlar por educación, lo que sugiere que el efecto combinado de ambas variables merece ser modelado explícitamente mediante el término de interacción `education_num * sex`.
+
+## Ajuste de Modelos (Regresión Logística)
+
+``` {r}
+# Modelo 1: efectos principales sin interacción
+# Categorías de referencia:
+# - sex: "Female"
+# - race: "White"
+modelo_base <- glm(
+  income ~ education_num + sex + race,
+  family = binomial,
+  data   = datos
+)
+
+
+# Modelo 2: incluye el término de interacción education_num * sex
+# La notación A * B es equivalente a A + B + A:B
+# es decir, incluye ambos efectos principales más el término de interacción
+modelo_int <- glm(
+  income ~ education_num * sex + race,
+  family = binomial,
+  data   = datos
+)
+
+summary(modelo_base)
+summary(modelo_int)
+```
