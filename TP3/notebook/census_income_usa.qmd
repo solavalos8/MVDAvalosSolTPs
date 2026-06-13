@@ -189,9 +189,53 @@ La variable `education_num`, toma valores enteros del 1 al 16 de forma ordenada 
 
 Una hipótesis plausible es que **la brecha de género en el acceso a ingresos altos se amplía o se reduce según el nivel educativo**. Es decir, podríamos sospechar que el retorno económico de la educación no es equivalente para hombres y mujeres: a medida que aumenta el nivel educativo, la probabilidad de ingresos altos podría crecer de forma diferente para cada sexo. Esto es consistente con la literatura sobre brechas salariales de género, que documenta que las mujeres frecuentemente necesitan mayores credenciales educativas para acceder a posiciones equivalentes a las de sus pares masculinos.
 
-El gráfico exploratorio de sexo refuerza esta sospecha: la brecha entre hombres y mujeres es marcada incluso sin controlar por educación, lo que sugiere que el efecto combinado de ambas variables merece ser modelado explícitamente mediante el término de interacción `education_num * sex`.
+Para justificar la inclusión de un término de interacción (education \* sex), primero debemos ver si la distribución del nivel educativo varía significativamente entre hombres y mujeres en nuestra muestra, y cómo se relaciona esto con el nivel de ingreso.
+
+```{r}
+# Primero dividimos los niveles educativos en tres: Primario (P), Secundario (S) y Post-secundario (PS) para que la visualización sea más clara.
+datos |>
+  mutate(
+    education_grupo = case_when(
+      education %in% c("Preschool", "1st-4th", "5th-6th",
+                       "7th-8th", "9th", "10th", "11th", "12th") ~ "P",
+      education %in% c("HS-grad", "Some-college",
+                       "Assoc-voc", "Assoc-acdm")                ~ "S",
+      education %in% c("Bachelors", "Masters",
+                       "Prof-school", "Doctorate")               ~ "PS"
+    ),
+    education_grupo = factor(education_grupo, levels = c("P", "S", "PS"))
+  ) |>
+  # Graficamos Education vs. Income facetado por género.
+  ggplot(aes(x = education_grupo, fill = income)) +
+  geom_bar(position = "fill", alpha = 0.8) +
+  facet_wrap(~ sex) +
+  scale_fill_manual(values = c("<=50K" = "#718096", ">50K" = "#2B6CB0"),
+                    name = "Ingreso") +
+  scale_y_continuous(labels = label_percent()) +
+  labs(
+    title    = "Nivel educativo e ingreso, separado por sexo",
+    subtitle = "¿Cambia el efecto de la educación dependiendo de si se es hombre o mujer?",
+    x        = "Nivel Educativo",
+    y        = "Proporción"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+```
+
+El gráfico muestra que a niveles educativos bajos la brecha de ingreso entre hombres y mujeres es reducida. Sin embargo, a medida que aumenta el nivel educativo la diferencia se amplía considerablemente: en el nivel post-secundario los hombres alcanzan casi un 80% de proporción de ingresos altos, mientras que las mujeres llegan al 50%. Esto respalda empíricamente la inclusión del término de interacción `education_num * sex` en el modelo.
 
 ## Ajuste de Modelos (Regresión Logística)
+
+Antes de ajustar los modelos, es importante especificar las categorías de referencia de cada variable categórica, ya que determinan qué cuantifica el intercepto. En ambos modelos las referencias son:
+
+- `sex`: **Female**. Los coeficientes de sexo se interpretan como el efecto de ser hombre respecto a ser mujer.
+
+- `race`: **White**. Los coeficientes de cada grupo racial se interpretan como la diferencia respecto a la población blanca.
+
+El intercepto representa entonces la log-odds de tener ingresos altos para una mujer blanca con nivel educativo igual a cero, es decir, el punto de partida sobre el cual se suman los efectos de cada predictor.
 
 ```{r}
 # Modelo 1: efectos principales sin interacción
@@ -276,67 +320,84 @@ ame |>
 
 - `race`: los grupos `Black` y `Amer-Indian-Eskimo` presentan una probabilidad aproximadamente 9.22 puntos porcentuales menor que la población blanca, mientras que `Other` muestra la brecha más amplia con -17.33 puntos porcentuales. `Asian-Pac-Islander` no resultó significativo: a pesar de mostrar la mayor proporción de ingresos altos en el análisis exploratorio, al controlar por educación y sexo el efecto desaparece, lo que sugiere que esa ventaja se explicaría por su composición educativa más que por la pertenencia racial en sí misma.
 
-- `education_num:sexMale`: el término de interacción no resultó significativo. Al promediar sobre todas las observaciones, no hay evidencia de que el retorno económico de la educación difiera entre hombres y mujeres en este dataset.
+- `education_num:sexMale`: el efecto marginal promedio de una interacción en un modelo logístico no tiene una interpretación directa en probabilidades. Esto se debe a que en la curva logística el efecto de una variable depende del punto de la curva desde el que se evalúe, y promediar ese efecto para una interacción requiere derivadas cruzadas dobles que pierden significado numérico directo. Para evaluar la interacción es más adecuado recurrir a los coeficientes del modelo y al forest plot de Odds Ratios que se presenta a continuación.
 
-## Gráfico de Coeficientes (Odds Ratios) con barras graduadas
+# **Comunicando el Modelo**
+
+## **Gráfico de Coeficientes (Odds Ratios) con barras graduadas**
+
+Para mostrar la robustez de nuestras estimaciones, es una excelente práctica graficar los coeficientes mostrando intervalos de confianza a distintos niveles. Un coeficiente que sobrevive al 99% sin cruzar la línea del 1 (en escala de OR) es evidencia irrefutable.
 
 ```{r}
-# Extraemos los coeficientes del modelo interactivo con broom
-or_data <- tidy(modelo_int, conf.int = TRUE, conf.level = 0.95) |>
-  filter(term != "(Intercept)") |>
+df_plot_or <- broom::tidy(modelo_int) |>
+  filter(!term %in% c("(Intercept)")) |>
   mutate(
-    # Exponenciamos para obtener Odds Ratios
-    or      = exp(estimate),
-    ci80_lo = exp(estimate - qnorm(0.90) * std.error),
-    ci80_hi = exp(estimate + qnorm(0.90) * std.error),
-    ci95_lo = exp(estimate - qnorm(0.975) * std.error),
-    ci95_hi = exp(estimate + qnorm(0.975) * std.error),
-    ci99_lo = exp(estimate - qnorm(0.995) * std.error),
-    ci99_hi = exp(estimate + qnorm(0.995) * std.error),
-    # Etiquetas más legibles para el gráfico
-    term = recode(term,
-                  "education_num"          = "Educación (num.)",
-                  "sexMale"                = "Sexo: Male",
-                  "raceAsian-Pac-Islander" = "Raza: Asian-Pac-Islander",
-                  "raceAmer-Indian-Eskimo" = "Raza: Amer-Indian-Eskimo",
-                  "raceOther"              = "Raza: Other",
-                  "raceBlack"              = "Raza: Black",
-                  "education_num:sexMale"  = "Educación × Sexo (Male)"
-    ),
-    # Significancia para colorear
-    significativo = p.value < 0.05
+    lo_80 = estimate - qnorm(0.90) * std.error,
+    hi_80 = estimate + qnorm(0.90) * std.error,
+    lo_95 = estimate - qnorm(0.975) * std.error,
+    hi_95 = estimate + qnorm(0.975) * std.error,
+    lo_99 = estimate - qnorm(0.995) * std.error,
+    hi_99 = estimate + qnorm(0.995) * std.error,
+    
+    across(c(estimate, starts_with("lo_"), starts_with("hi_")), exp),
+    
+    term_clean = case_match(
+      term,
+      "education_num"                ~ "Educación (num.)",
+      "sexMale"                      ~ "Sexo: Male (vs Female)",
+      "raceAsian-Pac-Islander"       ~ "Raza: Asian-Pac-Islander (vs White)",
+      "raceAmer-Indian-Eskimo"       ~ "Raza: Amer-Indian-Eskimo (vs White)",
+      "raceOther"                    ~ "Raza: Other (vs White)",
+      "raceBlack"                    ~ "Raza: Black (vs White)",
+      "education_num:sexMale"        ~ "Interacción: Educación × Male",
+      .default = term
+    )
   )
 
-# Forest plot
-ggplot(or_data, aes(x = or, y = reorder(term, or))) +
-  # Línea de referencia en OR = 1 (sin efecto)
-  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
-  # IC 99% — más fino
-  geom_errorbarh(aes(xmin = ci99_lo, xmax = ci99_hi),
-                 height = 0, linewidth = 0.5, color = "gray60") +
-  # IC 95% — grosor medio
-  geom_errorbarh(aes(xmin = ci95_lo, xmax = ci95_hi),
-                 height = 0, linewidth = 1.2, color = "gray40") +
-  # IC 80% — más grueso
-  geom_errorbarh(aes(xmin = ci80_lo, xmax = ci80_hi),
-                 height = 0, linewidth = 2.2, color = "gray20") +
-  # Punto central (OR)
-  geom_point(aes(color = significativo), size = 3) +
-  scale_color_manual(values = c("TRUE" = "#2B6CB0", "FALSE" = "gray60"),
-                     labels = c("TRUE" = "Significativo", "FALSE" = "No significativo"),
-                     name = NULL) +
-  # Escala logarítmica en X como pide la consigna
-  scale_x_log10() +
+#| fig-height: 8
+#| fig-width: 15
+
+ggplot(df_plot_or, aes(y = reorder(term_clean, estimate), x = estimate)) +
+  # Línea vertical de referencia en OR = 1 (Efecto nulo)
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray40", linewidth = 1) +
+  # Barra 99% (Fina y clara)
+  geom_linerange(aes(xmin = lo_99, xmax = hi_99), color = "#74ADD1", linewidth = 1.5) +
+  # Barra 95% (Media)
+  geom_linerange(aes(xmin = lo_95, xmax = hi_95), color = "#4575B4", linewidth = 3.5) +
+  # Barra 80% (Gruesa y oscura)
+  geom_linerange(aes(xmin = lo_80, xmax = hi_80), color = "#313695", linewidth = 6) +
+  
+  geom_point(color = "#D73027", size = 3) +
+  
+  scale_x_log10(breaks = c(0.25, 0.5, 1, 2, 4)) +
+  #Acortamos las etiquetas
+  scale_y_discrete(labels = c(
+    "Sexo: Male (vs Female)"              = "Male vs Female",
+    "Educación (num.)"                    = "Educación",
+    "Interacción: Educación × Male"       = "Educación × Male",
+    "Raza: Asian-Pac-Islander (vs White)" = "Asian-Pac-Islander",
+    "Raza: Amer-Indian-Eskimo (vs White)" = "Amer-Indian-Eskimo",
+    "Raza: Black (vs White)"              = "Black",
+    "Raza: Other (vs White)"              = "Other"
+  )) +
+  
   labs(
-    title    = "Efectos sociodemográficos sobre la probabilidad de ingresos altos",
-    subtitle = "Odds Ratios del modelo interactivo. Barras de error: 80% (gruesa), 95% (media), 99% (fina).",
-    x        = "Odds Ratio (escala log)",
-    y        = NULL
+    title   = "Efectos sociodemográficos sobre ingresos altos",
+    subtitle = "OR con barras de error: 80% (gruesa), 95% (media), 99% (fina)",
+    x       = "Odds Ratio (escala log)",
+    y       = NULL,
+    caption = "Si la barra cruza OR=1, el efecto no es significativo a ese nivel de confianza."
   ) +
+  theme_minimal(base_size = 15) +
   theme(
-  plot.title    = element_text(face = "bold", hjust = 0.5),
-  plot.subtitle = element_text(hjust = 0.5)
-)
+    plot.title         = element_text(face = "bold", hjust= 0.5, size = 12),
+    plot.subtitle      = element_text(hjust = 0.5, size = 10),
+    plot.caption       = element_text(size = 8),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.text.y        = element_text(size = 11),
+    axis.text.x        = element_text(size = 10)
+  )
 ```
 
 #### **Interpretación de los Odds Ratios (variables significativas):**
@@ -351,9 +412,9 @@ ggplot(or_data, aes(x = or, y = reorder(term, or))) +
 
 - `Raza: Other`: es el grupo con la mayor desventaja relativa, con aproximadamente un 60% menos chances que la población blanca.
 
-- `Educación × Sexo (Male)`: el término de interacción no resultó significativo, lo que indica que no hay evidencia de que el efecto de la educación sobre las chances de ingresos altos difiera entre hombres y mujeres en este dataset.
+- `Educación × Male`: el punto estimado está prácticamente sobre la línea de OR=1 y sus intervalos de confianza la cruzan incluso al 80%, lo que indica que no hay evidencia de que el retorno económico de la educación difiera entre hombres y mujeres. Sin embargo, el gráfico facetado de la sección anterior muestra que sí existe una diferencia visual en las proporciones, lo que sugiere que la interacción opera de forma no lineal a lo largo de la curva logística y no se captura bien mediante un único odds ratio promedio.
 
-## Comparación Global de Modelos
+## **Comparación Global de Modelos**
 
 ```{r}
 bind_rows(
@@ -387,7 +448,7 @@ bind_rows(
 
 #### Interpretación:
 
-La comparación global de modelos indica que la inclusión del término de interacción `education_num * sex` no mejora el ajuste. El modelo base y el interactivo explican la misma proporción de variación en el ingreso (Pseudo-R² de 0.169 en ambos casos), y la diferencia en AIC es mínima (de hecho, el modelo base tiene un AIC levemente menor, lo que significa que es preferible). En términos simples: incorporar la hipótesis de que el efecto de la educación es distinto para hombres y mujeres no agrega información útil al modelo. El modelo más simple explica los datos igual de bien, y por eso es el que nos quedamos.
+La comparación global de modelos indica que la inclusión del término de interacción `education_num * sex` no mejora el ajuste. El modelo base y el interactivo explican la misma proporción de variación en el ingreso (Pseudo-R² de 0.169 en ambos casos), y la diferencia en AIC es mínima — de hecho, el modelo base tiene un AIC levemente menor, lo que lo hace preferible por parsimonia. En términos simples: incorporar la hipótesis de que el efecto de la educación es distinto para hombres y mujeres no agrega información útil al modelo en términos estadísticos. Esto no implica necesariamente que la interacción no exista en la realidad, sino que la forma funcional lineal del modelo logístico no logra capturarla de forma significativa con estos datos.
 
 ## Conclusión
 
@@ -395,8 +456,8 @@ El análisis buscó identificar qué factores sociodemográficos determinan la p
 
 El hallazgo más contundente es la brecha de género. Ser hombre incrementa en casi 27 puntos porcentuales la probabilidad de tener ingresos altos respecto a ser mujer, independientemente del nivel educativo o la raza. Este resultado no sorprende a la luz de la literatura sobre mercados laborales, pero su magnitud es llamativa, ya que el sexo resultó ser el predictor más fuerte del modelo, por encima incluso de la educación.
 
-La educación, por su parte, tiene un efecto positivo y robusto: cada nivel adicional de escolaridad aumenta en promedio 7 puntos porcentuales la probabilidad de ingresos altos. Sin embargo, la hipótesis de que ese retorno educativo es distinto para hombres y mujeres, no encontró respaldo en los datos. El modelo interactivo no mejora al modelo base ni en ajuste ni en capacidad explicativa, lo que sugiere que la brecha de género opera de forma relativamente uniforme a lo largo de todos los niveles educativos.
+La educación tiene un efecto positivo y robusto: cada nivel adicional de escolaridad aumenta en promedio 7 puntos porcentuales la probabilidad de ingresos altos. La hipótesis de que ese retorno educativo es distinto para hombres y mujeres no encontró respaldo estadístico en el modelo, ya que el término de interacción no resultó ser significativo y el modelo interactivo no mejora al modelo base en ajuste ni en capacidad explicativa. Sin embargo, el análisis visual muestra que a niveles educativos altos la brecha de ingreso entre sexos se amplía considerablemente, lo que sugiere que la interacción opera de forma no lineal y no se captura bien mediante un único coeficiente promedio.nto a la raza, los resultados muestran desigualdades estructurales persistentes.
 
-En cuanto a la raza, los resultados muestran desigualdades estructurales persistentes. Los grupos `Black`, `Amer-Indian-Eskimo` y `Other` presentan probabilidades significativamente menores de acceder a ingresos altos respecto a la población blanca, aun controlando por educación y sexo. Esto indica que la desventaja racial no se explica únicamente por diferencias en el nivel educativo, sino que refleja barreras adicionales en el mercado laboral. El caso de `Asian-Pac-Islander` es particularmente interesante. A pesar de mostrar la mayor proporción de ingresos altos en el análisis exploratorio, su efecto desaparece al controlar por las demás variables, lo que sugiere que esa ventaja aparente se debe a su mayor nivel educativo promedio y no a la pertenencia racial en sí misma.
+Los grupos `Black`, `Amer-Indian-Eskimo` y `Other` presentan probabilidades significativamente menores de acceder a ingresos altos respecto a la población blanca, aun controlando por educación y sexo. Esto indica que la desventaja racial no se explica únicamente por diferencias en el nivel educativo, sino que refleja barreras adicionales en el mercado laboral. El caso de `Asian-Pac-Islander` es particularmente interesante. A pesar de mostrar la mayor proporción de ingresos altos en el análisis exploratorio, su efecto desaparece al controlar por las demás variables, lo que sugiere que esa ventaja aparente se debe a su mayor nivel educativo promedio y no a la pertenencia racial en sí misma.
 
 En síntesis, el modelo revela que el ingreso en Estados Unidos está fuertemente influenciado por el género y atravesado por desigualdades raciales que persisten más allá de la educación. La educación importa, pero no alcanza para explicar por sí sola quién accede al estrato de ingresos altos.
